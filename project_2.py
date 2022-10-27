@@ -1,4 +1,5 @@
 from cmath import inf
+from turtle import title
 from typing import Counter
 import numpy as np
 import pandas as pd
@@ -70,7 +71,7 @@ def count_total_orders(order):
 def eval_Distances(individual):
     sum_distances = 0
 
-    for i in range(0,no_cities-1):
+    for i in range(0,no_cities):
         if(i == 0):
             sum_distances = dist[0][individual[0]+1]
         else:
@@ -105,13 +106,14 @@ def plot_values(best_ind_original):
             y_values = [coord_xy[0][1], coord_xy[index][1]]
             plt.plot(x_values, y_values, 'bo', linestyle='--')
 
+    plt.grid()
     plt.show()
 
 def main():
     random.seed(64)
-    pop = toolbox.population(n=100)
+    pop = toolbox.population(n=200)
 
-    CXPB, MUTPB = 0.7, 0.2
+    CXPB, MUTPB = 0.70, 0.2
     
     print("Start of evolution")
 
@@ -132,8 +134,11 @@ def main():
     g = 0
 
     std = inf
+
+    arr_mean = []
+    arr_min = []
     
-    while g < 100 or std != 0:
+    while g < 50 or std != 0:
         g = g + 1
         print("-- Generation %i --" % g)
         
@@ -185,6 +190,16 @@ def main():
 
         print("Best individual in Generation %d %s, %s" % (g, best_ind_original, best_ind.fitness.values))
 
+        arr_mean.append(mean)
+        arr_min.append(min(fits))
+
+    x_coordinate = [i+1 for i in range(len(arr_mean))]
+    plt.plot(x_coordinate, arr_mean, label = "Average")
+    plt.plot(x_coordinate, arr_min, label = "Min")
+    plt.title("Min and Average Fitness over generations")
+    plt.legend()
+    plt.grid()
+    plt.figure()
     plot_values(best_ind_original)
 
 
