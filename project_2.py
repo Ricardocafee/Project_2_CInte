@@ -16,6 +16,7 @@ from deap import base
 from deap import benchmarks
 from deap import creator
 from deap import tools
+from deap import algorithms
 
 def front(self, n):
     return self.iloc[: , :n]
@@ -49,12 +50,44 @@ order = pd.DataFrame(df_ord).to_numpy()
 coord_xy = pd.DataFrame(df_xy).to_numpy()
 coord_xy = np.delete(coord_xy,0,1)
 
-creator.create("FitnessMax", base.Fitness, weights=(-1.0,))
-creator.create("Individual", list, fitness=creator.FitnessMax)
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+creator.create("Individual", list, fitness=creator.FitnessMin)
 
 toolbox = base.Toolbox()
 
 IND_SIZE = no_cities
+
+          
+def mutShuffleIndexes_modified(individual, indpb, threshold):
+    size = len(individual)
+    check = True
+
+
+    
+    for i in range(size):
+        if random.random() < indpb:
+            swap_indx = random.randint(0, size-2)
+            if swap_indx >= i:
+                swap_indx += 1
+            dif_ind = abs(i-swap_indx)
+
+            if(i>0):
+                if dist[individual[i-1]+1][individual[i]+1] < threshold and dif_ind>1:
+                    continue
+            if(i < no_cities-1):
+                if dist[individual[i+1]+1][individual[i]+1] < threshold and dif_ind>1:
+                    continue
+            if(swap_indx>0):
+                if dist[individual[swap_indx-1]+1][individual[swap_indx]+1] < threshold and dif_ind>1:
+                    continue
+            if(swap_indx < no_cities-1):
+                if dist[individual[swap_indx+1]+1][individual[swap_indx]+1] < threshold and dif_ind>1:
+                    continue
+            individual[i], individual[swap_indx] = individual[swap_indx], individual[i]
+
+    return individual
+
+
 
 toolbox.register("indices",random.sample, range(0,IND_SIZE), IND_SIZE)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.indices)
@@ -64,8 +97,10 @@ toolbox.register("select_post", tools.selTournament, tournsize=2)
 toolbox.register("mutate", tools.mutShuffleIndexes, indpb=1/no_cities)
 toolbox.register("mate", tools.cxOrdered)
 
-hof = tools.HallOfFame(30)
-hof_2 = tools.HallOfFame(40)
+hof = tools.HallOfFame(100)
+hof_2 = tools.HallOfFame(100)
+
+
 
 def BackBase(individual):
     sum_distances = 0
@@ -181,16 +216,20 @@ def plot_min_average(arr_mean, arr_min):
     plt.title("Min and Average Fitness over generations")
     plt.legend()
     plt.grid()
+
+def check_back_base(line):
+    index = random.randint(1,no_cities)
+    a = index-1
+    
         
 
 def main():
     no_population = 200
 
-    random.seed(45)
+    random.seed(7)
     pop = toolbox.population(n=no_population)
+    pop = list(map(toolbox.clone, pop))
 
-
-    
     CXPB, MUTPB = 0.7, 0.2
     
     print("Start of evolution")
@@ -225,21 +264,22 @@ def main():
     max_iter = 10000/no_population
     min_total = inf
     
-    while g < max_iter:
+    while g < 2*max_iter:
         g = g + 1
         print("-- Generation %i --" % g)
 
         if(g > max_iter/2 and g <= 3*max_iter/4):
-            CXPB = 0.6
-            MUTPB = 0.5
+            CXPB = 0.5
+            MUTPB = 0.1
         elif(g > 3*max_iter/4):
-            MUTPB = 0.4
+            MUTPB = 0.5
+            CXPB = 0.1
         if(g >= max_iter/4 and g <= max_iter/2):
-            CXPB = 0.2
-            MUTPB = 0.6
+            CXPB = 0.7
+            MUTPB = 0.1
         else:
-            CXPB = 0.6
-            MUTPB = 0.6
+            CXPB = 0.7
+            MUTPB = 0.1
 
            
         hof.update(pop)
@@ -272,13 +312,41 @@ def main():
                 del child1.fitness.values
                 del child2.fitness.values
 
+        count = 0
+        prev_mutant = 0
     
-        for mutant in offspring:
+        for mutant in offspring:  
+
+            current_mutant = mutant[:]
+            """print(current_mutant)"""
 
             # mutate an individual with probability MUTPB
             if random.random() < MUTPB:
-                toolbox.mutate(mutant)
+                if(g < max_iter/2):
+                    toolbox.mutate(mutant)
+                elif(g < 3*max_iter/4 and g >= max_iter/2):
+                    toolbox.mutate(mutant)
+                    # mutant = mutShuffleIndexes_modified(mutant, 1/no_cities, 0)
+                elif(g < 4*max_iter/5 and g >= 3*max_iter/4):
+                    mutant = mutShuffleIndexes_modified(mutant, 1/no_cities, 5)
+                    #toolbox.mutate(mutant)
+                else:
+                    mutant = mutShuffleIndexes_modified(mutant, 1/no_cities, 10)
+                    #toolbox.mutate(mutant)
                 del mutant.fitness.values
+
+            """modified_mutant = mutant
+            print(modified_mutant)
+
+            output = [modified_mutant.index(y) for x,y in zip(current_mutant, modified_mutant) if y != x]
+            
+            for i in range(30):
+                aux_1 = modified_mutant[i]
+                aux_2 = current_mutant[i]
+                if(aux_1 != aux_2):                    
+                    print(i)
+
+            count+=1"""
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
